@@ -15,6 +15,22 @@ flags.DEFINE_integer('num_threads', 1, 'number of threads')
 flags.DEFINE_string('dataset','1230', 'checkpoint name')
 flags.DEFINE_integer('epochs', 1000, 'epochs size')
 
+def load_and_enqueue(sess,coord,IR_shape,file_list,label_list,S,idx=0,num_thread=1):
+	count =0;
+    	length = len(file_list)
+    	rot=[0,90,180,270]
+    	while not coord.should_stop():
+		i = (count*num_thread + idx) % length;
+		j = random.randint(0,len(file_list[0])-1) # select an light direction
+		r = random.randint(0,2)
+		input_img = scipy.misc.imread(file_list[S[i]]).reshape([IR_shape[0],IR_shape[1],1]).astype(np.float32)
+		gt_img = scipy.misc.imread(label_list[S[i]]).reshape([IR_shape[0],IR_shape[1],3]).astype(np.float32)
+		input_img = input_img/127.5 -1.
+		gt_img = gt_img/127.5 -1.
+		input_img = scipy.ndimage.rotate(input_img,rot[r])
+		gt_img = scipy.ndimage.rotate(gt_img,rot[r])
+		sess.run(enqueue_op,feed_dict={IR_single:input_img,Normal_single:gt_img})
+		count +=1
 
 
 if __name__ =='__main__':
@@ -81,26 +97,10 @@ if __name__ =='__main__':
 	coord = tf.train.Coordinator()
 	num_thread =FLAGS.num_threads
 
-	def load_and_enqueue(coord,IR_shape,file_list,label_list,S,idx=0,num_thread=1):
-    		count =0;
-    		length = len(file_list)
-    		rot=[0,90,180,270]
-    		while not coord.should_stop():
-			i = (count*num_thread + idx) % length;
-			j = random.randint(0,len(file_list[0])-1) # select an light direction
-			r = random.randint(0,2)
-			input_img = scipy.misc.imread(file_list[S[i]]).reshape([IR_shape[0],IR_shape[1],1]).astype(np.float32)
-			gt_img = scipy.misc.imread(label_list[S[i]]).reshape([IR_shape[0],IR_shape[1],3]).astype(np.float32)
-			input_img = input_img/127.5 -1.
-			gt_img = gt_img/127.5 -1.
-			input_img = scipy.ndimage.rotate(input_img,rot[r])
-			gt_img = scipy.ndimage.rotate(gt_img,rot[r])
-			sess.run(enqueue_op,feed_dict={IR_single:input_img,Normal_single:gt_img})
-			count +=1
-
+	
 
 	for i in range(num_thread):
-		t = threading.Thread(target=load_and_enqueue,args=(coord,IR_shape,train_input,train_gt,S,i,num_thread))
+		t = threading.Thread(target=load_and_enqueue,args=(sess,coord,IR_shape,train_input,train_gt,S,i,num_thread))
 	    	t.start()
 
 	for epoch in xrange(FLAGS.epochs):
