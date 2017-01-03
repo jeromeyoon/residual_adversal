@@ -8,11 +8,11 @@ import tensorflow as tf
 
 flags = tf.app.flags
 FLAGS = flags.FLAGS
-flags.DEFINE_float('learning_rate', 0.002, 'Learning rate')
+flags.DEFINE_float('learning_rate', 0.00002, 'Learning rate')
 flags.DEFINE_float('dropout', 0.7, 'Drop out')
-flags.DEFINE_integer('batch_size', 1, 'Batch size')
+flags.DEFINE_integer('batch_size', 20, 'Batch size')
 flags.DEFINE_integer('num_threads', 1, 'number of threads')
-flags.DEFINE_string('dataset','1230', 'checkpoint name')
+flags.DEFINE_string('dataset','0102', 'checkpoint name')
 flags.DEFINE_integer('epochs', 1000, 'epochs size')
 
 def load_and_enqueue(sess,coord,IR_shape,file_list,label_list,S,idx=0,num_thread=1):
@@ -34,8 +34,8 @@ def load_and_enqueue(sess,coord,IR_shape,file_list,label_list,S,idx=0,num_thread
 
 
 if __name__ =='__main__':
-	if os.path.exists(os.path.join('checkpoint',FLAGS.dataset)):
-	    os.makedirs(os.path.join('checkpoint',FLAGS.datase))
+	if not os.path.exists(os.path.join('checkpoint',FLAGS.dataset)):
+	    os.makedirs(os.path.join('checkpoint',FLAGS.dataset))
 
 	IR_shape=[256,256,1]
 	Normal_shape=[256,256,3]
@@ -53,7 +53,6 @@ if __name__ =='__main__':
 	pred_Normal = models.resnet(IR_images, 20,64)
 	D_real = disnet.disnet(Normal_images,keep_prob,64)
 	D_fake = disnet.disnet(pred_Normal,keep_prob,64,reuse=True)
-	pdb.set_trace()
 	# Discriminator loss
 	D_loss_real = binary_cross_entropy_with_logits(tf.random_uniform(D_real.get_shape(),minval=0.7,maxval=1.2,dtype=tf.float32,seed=0), D_real)
 	D_loss_fake = binary_cross_entropy_with_logits(tf.random_uniform(D_fake.get_shape(),minval=0.0,maxval=0.3,dtype=tf.float32,seed=0), D_fake)
@@ -71,8 +70,9 @@ if __name__ =='__main__':
 	g_vars =[var for var in t_vars if 'conv_' in var.name]
 	global_step = tf.Variable(0,name='global_step',trainable=False)
 	global_step1 = tf.Variable(0,name='global_step1',trainable=False)
-	G_opt = tf.train.AdamOptimizer(FLAGS.learning_rate).minimize(Gen_loss,global_step=global_step,var_list=g_vars)
-	D_opt = tf.train.AdamOptimizer(FLAGS.learning_rate).minimize(D_loss,global_step=global_step1,var_list=d_vars)
+	g_lr = tf.train.exponential_decay(FLAGS.learning_rate,global_step,6000,0.5,staircase=True)
+	G_opt = tf.train.AdamOptimizer(g_lr).minimize(Gen_loss,global_step=global_step,var_list=g_vars)
+	D_opt = tf.train.AdamOptimizer(g_lr).minimize(D_loss,global_step=global_step1,var_list=d_vars)
 
 	sess = tf.Session()
 	sess.run(tf.initialize_all_variables())
@@ -114,7 +114,6 @@ if __name__ =='__main__':
 	    	else:
 			train_log = open(os.path.join("logs",'train_%s.log' %FLAGS.dataset),'aw')
 			val_log = open(os.path.join("logs",'val_%s.log' %FLAGS.dataset),'w')
-		pdb.set_trace()
 	    	for idx in xrange(0,batch_idxs):
 			start_time = time.time()
 			_,d_loss_real,d_loss_fake = sess.run([D_opt,D_loss_real,D_loss_fake],feed_dict={keep_prob:FLAGS.dropout})
@@ -124,8 +123,10 @@ if __name__ =='__main__':
 			sum_L += L_loss 	
 			sum_g += g_loss
 			sum_ang += ang_err
+	    		if np.mod(global_step.eval(session=sess),6000) ==0:
+			    saver.save(sess,os.path.join('checkpoint',FLAGS.dataset,'Res_DCGAN'),global_step=global_step)
 
-	    	train_log.write('epoch %06d mean_g %.6f  mean_L %.6f mean_ang %.6f mean_low %.6f mean_high %.6f\n' %(epoch,sum_g/(batch_idxs),sum_L/(batch_idxs),sum_ang/batch_idxs,sum_low/(batch_idxs),sum_high/batch_idxs))
+	    	train_log.write('epoch %06d mean_g %.6f  mean_L %.6f mean_ang %.6f \n' %(epoch,sum_g/(batch_idxs),sum_L/(batch_idxs),sum_ang/batch_idxs))
 	    	train_log.close()
 	    	saver.save(sess,os.path.join('checkpoint',FLAGS.dataset,'Res_DCGAN'),global_step=global_step)
 
