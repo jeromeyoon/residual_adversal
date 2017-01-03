@@ -36,9 +36,9 @@ def disnet(ipt,keep_prob,df_dims,reuse=False):
 	layers.append(h6)
 
     with tf.variable_scope('dis_fc3'):
-    	h7 = tf.nn.sigmoid(linear(layers[-1],1)) #output size: 1x1
-	layers.append(h7)
-    return layers[-1]
+    	h7 = linear(layers[-1],1) #output size: 1x1
+	#layers.append(h7)
+    return tf.nn.sigmoid(h7),h7
  
 
 def disblock(ipt,output_depth):

@@ -51,15 +51,20 @@ if __name__ =='__main__':
 
 	# Buidl networks
 	pred_Normal = models.resnet(IR_images, 20,64)
-	D_real = disnet.disnet(Normal_images,keep_prob,64)
-	D_fake = disnet.disnet(pred_Normal,keep_prob,64,reuse=True)
+	D_real,D_real_logits = disnet.disnet(Normal_images,keep_prob,64)
+	D_fake,D_fake_logits = disnet.disnet(pred_Normal,keep_prob,64,reuse=True)
 	# Discriminator loss
+	D_loss_real = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(D_real_logits, tf.ones_like(D_real)))
+	D_loss_fake = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(D_fake_logits, tf.zeros_like(D_fake)))
+	"""
 	D_loss_real = binary_cross_entropy_with_logits(tf.random_uniform(D_real.get_shape(),minval=0.7,maxval=1.2,dtype=tf.float32,seed=0), D_real)
 	D_loss_fake = binary_cross_entropy_with_logits(tf.random_uniform(D_fake.get_shape(),minval=0.0,maxval=0.3,dtype=tf.float32,seed=0), D_fake)
+	"""
 	D_loss = D_loss_real + D_loss_fake
 
 	# Generator loss
-	G_loss = binary_cross_entropy_with_logits(tf.ones_like(D_fake), D_fake)
+	G_loss= tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(D_fake_logits, tf.ones_like(D_fake)))
+	#G_loss = binary_cross_entropy_with_logits(tf.ones_like(D_fake), D_fake)
 	L2_loss = tf.sqrt(tf.reduce_mean(tf.square(Normal_images - pred_Normal)))
 	ang_loss = ang_loss.ang_error(pred_Normal,Normal_images) # ang_loss is normalized 0~1
 	Gen_loss = G_loss + L2_loss + ang_loss

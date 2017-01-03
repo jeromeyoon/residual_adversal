@@ -6,10 +6,12 @@ import tensorflow as tf
 def ang_error(samples,gt_samples):
 
     [b,h,w,c] = samples.get_shape().as_list()
+    samples = (samples +1.0)/2.0
+    gt_samples = (gt_samples +1.0)/2.0
     output = tf.nn.l2_normalize(samples,3)
     gt_output = tf.nn.l2_normalize(gt_samples,3)
     tmp = tf.mul(output,gt_output)
-    tmp = tf.div(tf.reduce_sum(tmp),b*h*w)
+    tmp = tf.div(tf.reduce_sum(tf.abs(tmp)),b*h*w)
     """
     samples = tf.div(tf.add(samples,1.0),2) # 0~1
     #samples = tf.mul(samples,mask)

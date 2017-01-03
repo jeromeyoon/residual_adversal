@@ -55,5 +55,5 @@ def resnet(inpt, n,num_filter):
 	filter_shape = [3,3,layers[-1].get_shape().as_list()[3],3]
 	filter_ = weight_variable(filter_shape)
 	conv_final = tf.nn.conv2d(layers[-1],filter=filter_,strides=[1,1,1,1],padding='SAME')		
-	layers.append(conv_final)
+	layers.append(tf.nn.tanh(conv_final))
     return layers[-1]
