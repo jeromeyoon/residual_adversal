@@ -128,8 +128,8 @@ if __name__ =='__main__':
 			start_time = time.time()
 			_,d_loss_real,d_loss_fake = sess.run([D_opt,D_loss_real,D_loss_fake],feed_dict={keep_prob:FLAGS.dropout})
 			_,g_loss,ang_err,L_loss = sess.run([G_opt,G_loss,ang_loss,L2_loss],feed_dict={keep_prob:FLAGS.dropout})
-			print("Epoch: [%2d] [%4d/%4d] time: %4.4f g_loss: %.6f L_loss:%.4f ang_loss: %.6f" \
-			% (epoch, idx, batch_idxs,time.time() - start_time,g_loss,L_loss,ang_err))
+			print("Epoch: [%2d] [%4d/%4d] time: %4.4f g_loss: %.6f d_real: %.6f d_fake: %.6f L_loss:%.4f ang_loss: %.6f" \
+			% (epoch, idx, batch_idxs,time.time() - start_time,g_loss,d_loss_real,d_loss_fake,L_loss,ang_err))
 			sum_L += L_loss 	
 			sum_g += g_loss
 			sum_ang += ang_err
