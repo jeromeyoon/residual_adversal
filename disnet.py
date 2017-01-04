@@ -32,7 +32,7 @@ def disnet(ipt,keep_prob,df_dims,reuse=False):
 	layers.append(h5)
 
     with tf.variable_scope('dis_fc2'):
-    	h6 = lrelu(linear(layers[-1],1024)) #output size: 1x1
+    	h6 = tf.nn.dropout(lrelu(linear(layers[-1],1024)),keep_prob) #output size: 1x1
 	layers.append(h6)
 
     with tf.variable_scope('dis_fc3'):

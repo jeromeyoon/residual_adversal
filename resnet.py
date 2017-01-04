@@ -1,3 +1,4 @@
+from ops import lrelu
 import numpy as np
 import tensorflow as tf
 
@@ -27,7 +28,7 @@ def conv_layer(inpt, filter_shape, stride):
         conv, mean, var, beta, gamma, 0.001,
         scale_after_normalization=True)
 
-    out = tf.nn.relu(batch_norm)
+    out = lrelu(batch_norm)
 
     return out
 

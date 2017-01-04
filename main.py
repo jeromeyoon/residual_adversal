@@ -8,11 +8,11 @@ import tensorflow as tf
 
 flags = tf.app.flags
 FLAGS = flags.FLAGS
-flags.DEFINE_float('learning_rate', 0.00002, 'Learning rate')
+flags.DEFINE_float('learning_rate', 0.0002, 'Learning rate')
 flags.DEFINE_float('dropout', 0.7, 'Drop out')
 flags.DEFINE_integer('batch_size', 20, 'Batch size')
-flags.DEFINE_integer('num_threads', 1, 'number of threads')
-flags.DEFINE_string('dataset','0102', 'checkpoint name')
+flags.DEFINE_integer('num_threads', 8, 'number of threads')
+flags.DEFINE_string('dataset','0103', 'checkpoint name')
 flags.DEFINE_integer('epochs', 1000, 'epochs size')
 
 def load_and_enqueue(sess,coord,IR_shape,file_list,label_list,S,idx=0,num_thread=1):
@@ -54,8 +54,8 @@ if __name__ =='__main__':
 	D_real,D_real_logits = disnet.disnet(Normal_images,keep_prob,64)
 	D_fake,D_fake_logits = disnet.disnet(pred_Normal,keep_prob,64,reuse=True)
 	# Discriminator loss
-	D_loss_real = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(D_real_logits, tf.ones_like(D_real)))
-	D_loss_fake = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(D_fake_logits, tf.zeros_like(D_fake)))
+	D_loss_real = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(D_real_logits, tf.random_uniform(D_real.get_shape(),minval=0.7,maxval=1.2,dtype=tf.float32,seed=0)))
+	D_loss_fake = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(D_fake_logits, tf.random_uniform(D_fake.get_shape(),minval=0.0,maxval=0.3,dtype=tf.float32,seed=0)))
 	"""
 	D_loss_real = binary_cross_entropy_with_logits(tf.random_uniform(D_real.get_shape(),minval=0.7,maxval=1.2,dtype=tf.float32,seed=0), D_real)
 	D_loss_fake = binary_cross_entropy_with_logits(tf.random_uniform(D_fake.get_shape(),minval=0.0,maxval=0.3,dtype=tf.float32,seed=0), D_fake)
@@ -67,7 +67,7 @@ if __name__ =='__main__':
 	#G_loss = binary_cross_entropy_with_logits(tf.ones_like(D_fake), D_fake)
 	L2_loss = tf.sqrt(tf.reduce_mean(tf.square(Normal_images - pred_Normal)))
 	ang_loss = ang_loss.ang_error(pred_Normal,Normal_images) # ang_loss is normalized 0~1
-	Gen_loss = G_loss + L2_loss + ang_loss
+	Gen_loss = 0.01*G_loss + 0.99*L2_loss + ang_loss
 
 	# Optimizer
 	t_vars = tf.trainable_variables()
@@ -83,20 +83,29 @@ if __name__ =='__main__':
 	sess.run(tf.initialize_all_variables())
 
 	saver = tf.train.Saver(max_to_keep=10)
-	ckpt = tf.train.latest_checkpoint(os.path.join('checkpoint',FLAGS.dataset))
+	ckpt = tf.train.get_checkpoint_state(os.path.join('checkpoint',FLAGS.dataset))
 	if ckpt and ckpt.model_checkpoint_path:
-	    	print "Restoring from checkpoint", checkpoint
-		saver.restore(sess, os.path.join('checkpoint',FLAGS.dataset,ckpt))
+	    	print "Restoring from checkpoint"
+        	ckpt_name = os.path.basename(ckpt.model_checkpoint_path)
+		saver.restore(sess, os.path.join('checkpoint',FLAGS.dataset,ckpt_name))
 	else:
 	    	print "Couldn't find checkpoint to restore from. Starting over."
 
 	####### Load training dataset #########
 	data = json.load(open("/research2/ECCV_journal/deconv/Adversal_vgg/patch_224/traininput.json"))
 	data_label = json.load(open("/research2/ECCV_journal/deconv/Adversal_vgg/patch_224/traingt.json"))
-	train_input =[data[idx] for idx in xrange(0,len(data))]
-	train_gt =[data_label[idx] for idx in xrange(0,len(data))]
-	train_input =[''.join(train_input[idx]) for idx in xrange(0,len(train_input))]
-	train_gt =[''.join(train_gt[idx]) for idx in xrange(0,len(train_gt))]
+	train_input1 =[data[idx] for idx in xrange(0,len(data))]
+	train_gt1 =[data_label[idx] for idx in xrange(0,len(data))]
+	tmp_input1 =[''.join(train_input1[idx]) for idx in xrange(0,len(train_input1))]
+	tmp_gt1 =[''.join(train_gt1[idx]) for idx in xrange(0,len(train_gt1))]
+
+        data_high = json.load(open("/research2/ECCV_journal/deconv/low_high/scale/high_traininput.json"))
+        data_high_label = json.load(open("/research2/ECCV_journal/deconv/low_high/scale/high_traingt.json"))
+        tmp_input2 =[''.join(data_high[idx]) for idx in xrange(0,len(data_high))]
+        tmp_gt2 =[''.join(data_high_label[idx]) for idx in xrange(0,len(data_high_label))]
+	train_input = tmp_input1+tmp_input2
+	train_gt = tmp_gt1+tmp_gt2
+
 	S = range(len(train_input))
 	random.shuffle(S)
 	coord = tf.train.Coordinator()
@@ -123,8 +132,8 @@ if __name__ =='__main__':
 			start_time = time.time()
 			_,d_loss_real,d_loss_fake = sess.run([D_opt,D_loss_real,D_loss_fake],feed_dict={keep_prob:FLAGS.dropout})
 			_,g_loss,ang_err,L_loss = sess.run([G_opt,G_loss,ang_loss,L2_loss],feed_dict={keep_prob:FLAGS.dropout})
-			print("Epoch: [%2d] [%4d/%4d] time: %4.4f g_loss: %.6f L_loss:%.4f ang_loss: %.6f" \
-			% (epoch, idx, batch_idxs,time.time() - start_time,g_loss,L_loss,ang_err))
+			print("Epoch: [%2d] [%4d/%4d] time: %4.4f g_loss: %.6f d_real: %.6f d_fake: %.6f L_loss:%.4f ang_loss: %.6f" \
+			% (epoch, idx, batch_idxs,time.time() - start_time,g_loss,d_loss_real,d_loss_fake,L_loss,ang_err))
 			sum_L += L_loss 	
 			sum_g += g_loss
 			sum_ang += ang_err
