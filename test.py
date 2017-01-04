@@ -12,7 +12,7 @@ flags.DEFINE_float('learning_rate', 0.002, 'Learning rate')
 flags.DEFINE_float('dropout', 0.7, 'Drop out')
 flags.DEFINE_integer('batch_size', 1, 'Batch size')
 flags.DEFINE_integer('num_threads', 1, 'number of threads')
-flags.DEFINE_string('dataset','0103', 'checkpoint name')
+flags.DEFINE_string('dataset','0104_2', 'checkpoint name')
 flags.DEFINE_integer('epochs', 1000, 'epochs size')
 
 

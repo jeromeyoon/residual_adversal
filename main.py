@@ -12,7 +12,7 @@ flags.DEFINE_float('learning_rate', 0.0002, 'Learning rate')
 flags.DEFINE_float('dropout', 0.7, 'Drop out')
 flags.DEFINE_integer('batch_size', 20, 'Batch size')
 flags.DEFINE_integer('num_threads', 8, 'number of threads')
-flags.DEFINE_string('dataset','0103', 'checkpoint name')
+flags.DEFINE_string('dataset','0104_2', 'checkpoint name')
 flags.DEFINE_integer('epochs', 1000, 'epochs size')
 
 def load_and_enqueue(sess,coord,IR_shape,file_list,label_list,S,idx=0,num_thread=1):
@@ -67,7 +67,7 @@ if __name__ =='__main__':
 	#G_loss = binary_cross_entropy_with_logits(tf.ones_like(D_fake), D_fake)
 	L2_loss = tf.sqrt(tf.reduce_mean(tf.square(Normal_images - pred_Normal)))
 	ang_loss = ang_loss.ang_error(pred_Normal,Normal_images) # ang_loss is normalized 0~1
-	Gen_loss = 0.01*G_loss + 0.99*L2_loss + ang_loss
+	Gen_loss = 0.1*G_loss + 0.5*L2_loss + 0.4*ang_loss
 
 	# Optimizer
 	t_vars = tf.trainable_variables()
@@ -139,7 +139,7 @@ if __name__ =='__main__':
 			sum_L += L_loss 	
 			sum_g += g_loss
 			sum_ang += ang_err
-	    		if np.mod(global_step.eval(session=sess),6000) ==0:
+	    		if np.mod(global_step.eval(session=sess),3000) ==0:
 			    saver.save(sess,os.path.join('checkpoint',FLAGS.dataset,'Res_DCGAN'),global_step=global_step)
 
 	    	train_log.write('epoch %06d mean_g %.6f  mean_L %.6f mean_ang %.6f \n' %(epoch,sum_g/(batch_idxs),sum_L/(batch_idxs),sum_ang/batch_idxs))
