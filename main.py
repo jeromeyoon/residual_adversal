@@ -78,8 +78,10 @@ if __name__ =='__main__':
 	g_lr = tf.train.exponential_decay(FLAGS.learning_rate,global_step,6000,0.5,staircase=True)
 	G_opt = tf.train.AdamOptimizer(g_lr).minimize(Gen_loss,global_step=global_step,var_list=g_vars)
 	D_opt = tf.train.AdamOptimizer(g_lr).minimize(D_loss,global_step=global_step1,var_list=d_vars)
-
-	sess = tf.Session()
+	
+	config  = tf.ConfigProto()
+	config.gpu_options.allow_growth = True
+	sess = tf.Session(config=config)
 	sess.run(tf.initialize_all_variables())
 
 	saver = tf.train.Saver(max_to_keep=10)
