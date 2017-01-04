@@ -2,7 +2,7 @@ import tensorflow as tf
 from resnet import softmax_layer, conv_layer, residual_block, weight_variable
 
 # ResNet architectures used for CIFAR-10
-def resnet(inpt, n,num_filter):
+def resnet(inpt,mask, n,num_filter):
     if n < 20 or (n - 20) % 12 != 0:
         print "ResNet depth invalid."
         return
@@ -54,6 +54,7 @@ def resnet(inpt, n,num_filter):
     with tf.variable_scope('conv_final'):
 	filter_shape = [3,3,layers[-1].get_shape().as_list()[3],3]
 	filter_ = weight_variable(filter_shape)
-	conv_final = tf.nn.conv2d(layers[-1],filter=filter_,strides=[1,1,1,1],padding='SAME')		
-	layers.append(tf.nn.tanh(conv_final))
+	conv_final = tf.nn.tanh(tf.nn.conv2d(layers[-1],filter=filter_,strides=[1,1,1,1],padding='SAME'))
+        conv_final = tf.mul(conv_final,mask)		
+	layers.append((conv_final))
     return layers[-1]

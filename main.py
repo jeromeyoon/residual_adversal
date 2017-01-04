@@ -11,9 +11,13 @@ FLAGS = flags.FLAGS
 flags.DEFINE_float('learning_rate', 0.00002, 'Learning rate')
 flags.DEFINE_float('dropout', 0.7, 'Drop out')
 flags.DEFINE_integer('batch_size', 20, 'Batch size')
-flags.DEFINE_integer('num_threads', 1, 'number of threads')
-flags.DEFINE_string('dataset','0102', 'checkpoint name')
+flags.DEFINE_integer('num_threads', 16, 'number of threads')
+flags.DEFINE_string('dataset','0104', 'checkpoint name')
 flags.DEFINE_integer('epochs', 1000, 'epochs size')
+
+def create_mask(images):
+    mask = [images >-1.][0]*1.
+    return mask
 
 def load_and_enqueue(sess,coord,IR_shape,file_list,label_list,S,idx=0,num_thread=1):
 	count =0;
@@ -21,7 +25,6 @@ def load_and_enqueue(sess,coord,IR_shape,file_list,label_list,S,idx=0,num_thread
     	rot=[0,90,180,270]
     	while not coord.should_stop():
 		i = (count*num_thread + idx) % length;
-		j = random.randint(0,len(file_list[0])-1) # select an light direction
 		r = random.randint(0,2)
 		input_img = scipy.misc.imread(file_list[S[i]]).reshape([IR_shape[0],IR_shape[1],1]).astype(np.float32)
 		gt_img = scipy.misc.imread(label_list[S[i]]).reshape([IR_shape[0],IR_shape[1],3]).astype(np.float32)
@@ -29,7 +32,8 @@ def load_and_enqueue(sess,coord,IR_shape,file_list,label_list,S,idx=0,num_thread
 		gt_img = gt_img/127.5 -1.
 		input_img = scipy.ndimage.rotate(input_img,rot[r])
 		gt_img = scipy.ndimage.rotate(gt_img,rot[r])
-		sess.run(enqueue_op,feed_dict={IR_single:input_img,Normal_single:gt_img})
+		mask = create_mask(input_img)
+		sess.run(enqueue_op,feed_dict={IR_single:input_img,Mask_single:mask,Normal_single:gt_img})
 		count +=1
 
 
@@ -43,14 +47,15 @@ if __name__ =='__main__':
 	# Threading setting 
 	print 'Queue loading'
 	IR_single = tf.placeholder(tf.float32,shape= IR_shape)
+	Mask_single = tf.placeholder(tf.float32,shape= IR_shape)
 	Normal_single = tf.placeholder(tf.float32,shape=Normal_shape)
 	keep_prob = tf.placeholder(tf.float32)
-	q = tf.FIFOQueue(4000,[tf.float32,tf.float32],[[IR_shape[0],IR_shape[1],1],[Normal_shape[0],Normal_shape[1],3]])
-	enqueue_op = q.enqueue([IR_single,Normal_single])
-	IR_images,Normal_images = q.dequeue_many(FLAGS.batch_size)
+	q = tf.FIFOQueue(4000,[tf.float32,tf.float32,tf.float32],[[IR_shape[0],IR_shape[1],1],[IR_shape[0],IR_shape[1],1],[Normal_shape[0],Normal_shape[1],3]])
+	enqueue_op = q.enqueue([IR_single,Mask_single,Normal_single])
+	IR_images,Mask_images,Normal_images = q.dequeue_many(FLAGS.batch_size)
 
 	# Buidl networks
-	pred_Normal = models.resnet(IR_images, 20,64)
+	pred_Normal = models.resnet(IR_images,Mask_images, 20,64)
 	D_real,D_real_logits = disnet.disnet(Normal_images,keep_prob,64)
 	D_fake,D_fake_logits = disnet.disnet(pred_Normal,keep_prob,64,reuse=True)
 	# Discriminator loss
@@ -66,7 +71,7 @@ if __name__ =='__main__':
 	G_loss= tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(D_fake_logits, tf.ones_like(D_fake)))
 	#G_loss = binary_cross_entropy_with_logits(tf.ones_like(D_fake), D_fake)
 	L2_loss = tf.sqrt(tf.reduce_mean(tf.square(Normal_images - pred_Normal)))
-	ang_loss = ang_loss.ang_error(pred_Normal,Normal_images) # ang_loss is normalized 0~1
+	ang_loss = ang_loss.ang_error(pred_Normal,Normal_images,Mask_images) # ang_loss is normalized 0~1
 	Gen_loss = G_loss + L2_loss + ang_loss
 
 	# Optimizer
