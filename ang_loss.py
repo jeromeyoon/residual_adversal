@@ -6,6 +6,7 @@ import tensorflow as tf
 def ang_error(samples,gt_samples,mask_samples):
 
     [b,h,w,c] = samples.get_shape().as_list()
+    #mask_samples = (mask_samples +1.0)/2.0
     valid_pixel = tf.reduce_sum(mask_samples)
     samples = (samples +1.0)/2.0
     gt_samples = (gt_samples +1.0)/2.0

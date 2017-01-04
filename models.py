@@ -55,6 +55,8 @@ def resnet(inpt,mask, n,num_filter):
 	filter_shape = [3,3,layers[-1].get_shape().as_list()[3],3]
 	filter_ = weight_variable(filter_shape)
 	conv_final = tf.nn.tanh(tf.nn.conv2d(layers[-1],filter=filter_,strides=[1,1,1,1],padding='SAME'))
-        conv_final = tf.mul(conv_final,mask)		
+        tmp1 = tf.mul(conv_final,mask)		
+        tmp2 = [tmp1 == 0][0] *-1.
+	conv_final = tmp1 + tmp2			
 	layers.append((conv_final))
     return layers[-1]

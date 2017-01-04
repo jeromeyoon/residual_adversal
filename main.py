@@ -16,8 +16,14 @@ flags.DEFINE_string('dataset','0104', 'checkpoint name')
 flags.DEFINE_integer('epochs', 1000, 'epochs size')
 
 def create_mask(images):
-    mask = [images >-1.][0]*1.
-    return mask
+    tmp1 = [images >-1.][0]*1.
+    #tmp2 = [tmp1 ==0][0]*-1.
+    #mask = tmp1 + tmp2
+    return tmp1
+
+
+def indices(a,func):
+    return [i for (i,val) in enumerate(a) if func(val)]
 
 def load_and_enqueue(sess,coord,IR_shape,file_list,label_list,S,idx=0,num_thread=1):
 	count =0;
