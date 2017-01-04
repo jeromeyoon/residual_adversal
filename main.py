@@ -13,6 +13,7 @@ flags.DEFINE_float('dropout', 0.7, 'Drop out')
 flags.DEFINE_integer('batch_size', 20, 'Batch size')
 flags.DEFINE_integer('num_threads', 16, 'number of threads')
 flags.DEFINE_string('dataset','0104', 'checkpoint name')
+flags.DEFINE_float('gpu_ratio','1.0', 'gpu fraction')
 flags.DEFINE_integer('epochs', 1000, 'epochs size')
 
 def create_mask(images):
@@ -65,8 +66,8 @@ if __name__ =='__main__':
 	D_real,D_real_logits = disnet.disnet(Normal_images,keep_prob,64)
 	D_fake,D_fake_logits = disnet.disnet(pred_Normal,keep_prob,64,reuse=True)
 	# Discriminator loss
-	D_loss_real = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(D_real_logits, tf.ones_like(D_real)))
-	D_loss_fake = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(D_fake_logits, tf.zeros_like(D_fake)))
+	D_loss_real = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(D_real_logits, tf.random_uniform(D_real.get_shape(),minval=0.7,maxval=1.2,dtype=tf.float32,seed=0)))
+	D_loss_fake = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(D_fake_logits, tf.random_uniform(D_fake.get_shape(),minval=0.0,maxval=0.3,dtype=tf.float32,seed=0)))
 	"""
 	D_loss_real = binary_cross_entropy_with_logits(tf.random_uniform(D_real.get_shape(),minval=0.7,maxval=1.2,dtype=tf.float32,seed=0), D_real)
 	D_loss_fake = binary_cross_entropy_with_logits(tf.random_uniform(D_fake.get_shape(),minval=0.0,maxval=0.3,dtype=tf.float32,seed=0), D_fake)
@@ -90,7 +91,10 @@ if __name__ =='__main__':
 	G_opt = tf.train.AdamOptimizer(g_lr).minimize(Gen_loss,global_step=global_step,var_list=g_vars)
 	D_opt = tf.train.AdamOptimizer(g_lr).minimize(D_loss,global_step=global_step1,var_list=d_vars)
 
-	sess = tf.Session()
+
+	config = tf.ConfigProto()
+	config.gpu_options.per_process_gpu_memory_fraction = FLAGS.gpu_ratio
+	sess = tf.Session(config=config)
 	sess.run(tf.initialize_all_variables())
 
 	saver = tf.train.Saver(max_to_keep=10)
