@@ -20,11 +20,12 @@ def disnet(ipt,keep_prob,df_dims,reuse=False):
         with tf.variable_scope('dis_conv3_%d' %(i+1)):     
             h3 = disblock(layers[-1],df_dims*2)#output 24 x 24 
 	    layers.append(h3)
-    
+    """    
     for i in range(num_block):
         with tf.variable_scope('dis_conv4_%d' %(i+1)):     
             h4 = disblock(layers[-1],df_dims*4) #output 6 x 6
 	    layers.append(h4)
+    """
     with tf.variable_scope('dis_fc1'):
 	batch_size = layers[-1].get_shape().as_list()[0]
 	h5 = tf.reshape(layers[-1],[batch_size,-1])

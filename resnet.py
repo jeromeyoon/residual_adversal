@@ -14,7 +14,7 @@ def softmax_layer(inpt, shape):
 
     return fc_h
 
-def conv_layer(inpt, filter_shape, stride):
+def conv_layer(inpt, filter_shape, stride,batch=True):
     out_channels = filter_shape[3]
 
     filter_ = weight_variable(filter_shape)
@@ -22,15 +22,15 @@ def conv_layer(inpt, filter_shape, stride):
     mean, var = tf.nn.moments(conv, axes=[0,1,2])
     beta = tf.Variable(tf.zeros([out_channels]), name="beta")
     gamma = weight_variable([out_channels], name="gamma")
-    
-    batch_norm = tf.nn.batch_norm_with_global_normalization(
-        conv, mean, var, beta, gamma, 0.001,
-        scale_after_normalization=True)
-
-    out = tf.nn.relu(batch_norm)
-
-    return out
-
+    if batch: 
+        batch_norm = tf.nn.batch_norm_with_global_normalization(
+            conv, mean, var, beta, gamma, 0.001,
+            scale_after_normalization=True)
+        out = tf.nn.relu(batch_norm)
+        return out
+    else:
+        out = tf.nn.relu(conv)
+        return out
 def residual_block(inpt, output_depth, down_sample, projection=False):
     input_depth = inpt.get_shape().as_list()[3]
     if down_sample:
@@ -52,3 +52,10 @@ def residual_block(inpt, output_depth, down_sample, projection=False):
 
     res = conv2 + input_layer
     return res
+
+
+def deconv_layer(inpt,output_shape,filter_shape,stride):
+
+    filter_ = weight_variable(filter_shape)
+    deconv = tf.nn.conv2d_transpose(inpt,filter_,output_shape=output_shape,strides=[1,stride,stride,1],padding='SAME')
+    return deconv
