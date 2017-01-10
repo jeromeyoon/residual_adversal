@@ -12,8 +12,8 @@ FLAGS = flags.FLAGS
 flags.DEFINE_float('learning_rate', 0.0002, 'Learning rate')
 flags.DEFINE_float('dropout', 0.7, 'Drop out')
 flags.DEFINE_integer('batch_size', 20, 'Batch size')
-flags.DEFINE_integer('num_threads', 1, 'number of threads')
-flags.DEFINE_string('dataset','0108', 'checkpoint name')
+flags.DEFINE_integer('num_threads', 8, 'number of threads')
+flags.DEFINE_string('dataset','0110', 'checkpoint name')
 flags.DEFINE_float('gpu_ratio','1.0', 'gpu fraction')
 flags.DEFINE_integer('epochs', 1000, 'epochs size')
 
@@ -40,9 +40,16 @@ def load_and_enqueue(sess,coord,IR_shape,file_list,label_list,S,idx=0,num_thread
 		gt_img = gt_img/127.5 -1.
 		rand_x = np.random.randint(64,224-64)
 		rand_y = np.random.randint(64,224-64)
+		ipt =  input_img[rand_y:rand_y+64,rand_x:rand_x+64,:]
+		label = gt_img[rand_y:rand_y+64,rand_x:rand_x+64,:]
+		mask = create_mask(ipt)
+		#gamma = np.random.uniform(0.7,2.5)
+		#gamma = 2.2	
+		#ipt = np.power((ipt/255.0),1/gamma)*255.0
+		#ipt = ipt /127.5 -1.
 		#input_img = scipy.ndimage.rotate(input_img,rot[r])
 		#gt_img = scipy.ndimage.rotate(gt_img,rot[r])
-		sess.run(enqueue_op,feed_dict={IR_single:input_img[rand_y:rand_y+64,rand_x:rand_x+64,:],Normal_single:gt_img[rand_y:rand_y+64,rand_x:rand_x+64,:]})
+		sess.run(enqueue_op,feed_dict={IR_single:ipt,Mask_single:mask,Normal_single:label})
 		count +=1
 
 
@@ -56,11 +63,12 @@ if __name__ =='__main__':
 	# Threading setting 
 	print 'Queue loading'
 	IR_single = tf.placeholder(tf.float32,shape= IR_shape)
+	Mask_single = tf.placeholder(tf.float32,shape= IR_shape)
 	Normal_single = tf.placeholder(tf.float32,shape=Normal_shape)
 	keep_prob = tf.placeholder(tf.float32)
-	q = tf.FIFOQueue(8000,[tf.float32,tf.float32],[[IR_shape[0],IR_shape[1],1],[Normal_shape[0],Normal_shape[1],3]])
-	enqueue_op = q.enqueue([IR_single,Normal_single])
-	IR_images,Normal_images = q.dequeue_many(FLAGS.batch_size)
+	q = tf.FIFOQueue(8000,[tf.float32,tf.float32,tf.float32],[[IR_shape[0],IR_shape[1],1],[IR_shape[0],IR_shape[1],1],[Normal_shape[0],Normal_shape[1],3]])
+	enqueue_op = q.enqueue([IR_single,Mask_single,Normal_single])
+	IR_images,Mask_images,Normal_images = q.dequeue_many(FLAGS.batch_size)
 
 	# Buidl networks
 	pred_Normal = models.resnet(IR_images, 20,64)
@@ -69,23 +77,18 @@ if __name__ =='__main__':
 	# Discriminator loss
 	D_loss_real = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(D_real_logits, tf.random_uniform(D_real.get_shape(),minval=0.7,maxval=1.2,dtype=tf.float32)))
 	D_loss_fake = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(D_fake_logits, tf.random_uniform(D_fake.get_shape(),minval=0.0,maxval=0.3,dtype=tf.float32)))
-
-	"""
-	D_loss_real = binary_cross_entropy_with_logits(tf.random_uniform(D_real.get_shape(),minval=0.7,maxval=1.2,dtype=tf.float32,seed=0), D_real)
-	D_loss_fake = binary_cross_entropy_with_logits(tf.random_uniform(D_fake.get_shape(),minval=0.0,maxval=0.3,dtype=tf.float32,seed=0), D_fake)
-	"""
 	D_loss = D_loss_real + D_loss_fake
 
 	# Generator loss
 	#G_loss= tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(D_fake_logits, tf.ones_like(D_fake)))
 	G_loss= tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(D_fake_logits, tf.random_uniform(D_fake.get_shape(),minval=0.7,maxval=1.2,dtype=tf.float32)))
-	#G_loss = binary_cross_entropy_with_logits(tf.ones_like(D_fake), D_fake)
-	L2_loss = tf.reduce_mean(tf.square(Normal_images - pred_Normal))
-	ang_tmp,ang_loss = ang_loss.ang_error(pred_Normal,Normal_images) # ang_loss is normalized 0~1
+	pdb.set_trace()
+	L2_loss = tf.reduce_mean(tf.square(Normal_images[:,10:-10,10:-10,:] - pred_Normal[:,10:-10,10:-10,:]))
+	ang_tmp,ang_loss = ang_loss.ang_error(pred_Normal[:,10:-10,10:-10,:],Normal_images[:,10:-10,10:-10,:]) # ang_loss is normalized 0~1
 	#ei_loss = tf.py_func(compute_ei,[pred_Normal],[tf.float64])
 	#ei_loss = tf.pack(ei_loss[0])
 	#ei_loss = tf.to_float(ei_loss[0])
-	Gen_loss = G_loss + L2_loss*100 + ang_loss*100 
+	Gen_loss = G_loss*0.1 + L2_loss + ang_loss
 
 	# Optimizer
 	t_vars = tf.trainable_variables()
@@ -103,7 +106,8 @@ if __name__ =='__main__':
 	sess = tf.Session(config=config)
 	sess.run(tf.initialize_all_variables())
 
-	saver = tf.train.Saver(max_to_keep=10)
+
+	pdb.set_trace()	saver = tf.train.Saver(max_to_keep=10)
 	ckpt = tf.train.latest_checkpoint(os.path.join('checkpoint',FLAGS.dataset))
 	if ckpt and ckpt.model_checkpoint_path:
 	    	print "Restoring from checkpoint", checkpoint
