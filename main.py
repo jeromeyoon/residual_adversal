@@ -83,7 +83,7 @@ if __name__ =='__main__':
 	#G_loss= tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(D_fake_logits, tf.ones_like(D_fake)))
 	G_loss= tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(D_fake_logits, tf.random_uniform(D_fake.get_shape(),minval=0.7,maxval=1.2,dtype=tf.float32)))
 	pdb.set_trace()
-	L2_loss = tf.reduce_mean(tf.square(Normal_images[:,10:-10,10:-10,:] - pred_Normal[:,10:-10,10:-10,:]))
+	L2_loss = tf.sqrt(tf.reduce_mean(tf.square(Normal_images[:,10:-10,10:-10,:] - pred_Normal[:,10:-10,10:-10,:])))
 	ang_tmp,ang_loss = ang_loss.ang_error(pred_Normal[:,10:-10,10:-10,:],Normal_images[:,10:-10,10:-10,:]) # ang_loss is normalized 0~1
 	#ei_loss = tf.py_func(compute_ei,[pred_Normal],[tf.float64])
 	#ei_loss = tf.pack(ei_loss[0])
@@ -107,7 +107,7 @@ if __name__ =='__main__':
 	sess.run(tf.initialize_all_variables())
 
 
-	pdb.set_trace()	saver = tf.train.Saver(max_to_keep=10)
+	saver = tf.train.Saver(max_to_keep=10)
 	ckpt = tf.train.latest_checkpoint(os.path.join('checkpoint',FLAGS.dataset))
 	if ckpt and ckpt.model_checkpoint_path:
 	    	print "Restoring from checkpoint", checkpoint
