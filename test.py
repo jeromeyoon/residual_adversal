@@ -3,20 +3,23 @@ import numpy as np
 import disnet
 from ops import *
 import scipy.ndimage
+import scipy.io as sio
 import tensorflow as tf
 
 
 flags = tf.app.flags
 FLAGS = flags.FLAGS
-flags.DEFINE_float('learning_rate', 0.002, 'Learning rate')
 flags.DEFINE_float('dropout', 1.0, 'Drop out')
 flags.DEFINE_integer('batch_size', 1, 'Batch size')
 flags.DEFINE_integer('num_threads', 1, 'number of threads')
 flags.DEFINE_string('dataset','0105', 'checkpoint name')
-flags.DEFINE_integer('epochs', 1000, 'epochs size')
 
 def create_mask(images):
     tmp1 = [images >-1.][0]*1.
+    return tmp1
+
+def create_mask2(images):
+    tmp1 = [images ==-1.][0]*-1.
     return tmp1
 
 
@@ -57,32 +60,34 @@ if __name__ =='__main__':
 			for idx3 in range(5,7): # light source 
 				print("Selected material %03d/%d" % (list_val[idx],idx2))
 			        img = '/research2/IR_normal_small/save%03d/%d' % (list_val[idx],idx2)
-			        input_ = scipy.misc.imread(img+'/%d.bmp' %idx3).astype(float) #input NIR image
+			        input_ = scipy.misc.imread(img+'/%d.bmp' %idx3).astype(np.float32) #input NIR image
 			        input_ = scipy.misc.imresize(input_,[600,800])
 			        input_  = input_/127.5 -1.0 # normalize -1 ~1
 			        input_ = np.reshape(input_,(1,600,800,1)) 
 			        input_ = np.array(input_).astype(np.float32)
 				mask = np.squeeze(create_mask(input_))
 				mask = np.expand_dims(mask,axis=-1)
+				mask2 = np.squeeze(create_mask2(input_))
+				mask2 = np.expand_dims(mask2,axis=-1)
+				mask2 = np.tile(mask2,(1,1,3))
 			        #input_ = input_ - mean_mask	
 			        start_time = time.time() 
 			        sample  = sess.run(pred_Normal, feed_dict={IR_images: input_})
-			        #sample = sess.run(dcgan.sampler, feed_dict={dcgan.ir_images: input_})
 			        print('time: %.8f' %(time.time()-start_time))     
 			        # normalization #
 			        sample = np.squeeze(sample).astype(np.float32)
+				sample = sample * mask +mask2
+				t = np.square(sample)
+				t = np.sqrt(t.sum(axis=2))
+				t = np.expand_dims(t,axis=-1)
+				sample/=t	
 			        sample = (sample+1.)/2.
-				#output = sample
-				
-				sample = sample * mask
-			        output = np.sqrt(np.clip(np.sum(np.power(sample,2),axis=2),1e-10,3.))
-			        output = np.expand_dims(output,axis=-1)
-			        output = sample/output
 				
 			        if not os.path.exists(os.path.join(savepath,'%s/%s/%03d/%d' %(FLAGS.dataset,ckpt_name,list_val[idx],idx2))):
 			            os.makedirs(os.path.join(savepath,'%s/%s/%03d/%d' %(FLAGS.dataset,ckpt_name,list_val[idx],idx2)))
 			        savename = os.path.join(savepath,'%s/%s/%03d/%d/single_normal_%03d.bmp' % (FLAGS.dataset,ckpt_name,list_val[idx],idx2,idx3))
-			        scipy.misc.imsave(savename, output)
+			        scipy.misc.imsave(savename, np.uint8(sample*255))
+				#sio.savemat('11_output.mat',{'normal':sample})
 
 
 	sess.close()

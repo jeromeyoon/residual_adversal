@@ -18,7 +18,7 @@ def ang_error(samples,gt_samples):
 
 def l2_normalize(input_):
     tmp1 = tf.square(input_)
-    tmp2 = tf.sqrt(tf.reduce_sum(tmp1,3))
-    tmp3 = tf.expand_dims(tf.maximum(tmp2,1e-12),-1)
-    tmp4 = tf.div(input_,tmp3)
+    tmp2 = tf.expand_dims(tf.sqrt(tf.reduce_sum(tmp1,-1)),-1)
+    #tmp3 = tf.expand_dims(tf.maximum(tmp2,1e-12),-1)
+    tmp4 = tf.div(input_,tmp2)
     return tmp4
