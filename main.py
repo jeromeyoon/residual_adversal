@@ -12,8 +12,8 @@ FLAGS = flags.FLAGS
 flags.DEFINE_float('learning_rate', 0.0002, 'Learning rate')
 flags.DEFINE_float('dropout', 0.5, 'Drop out')
 flags.DEFINE_integer('batch_size', 20, 'Batch size')
-flags.DEFINE_integer('num_threads', 1, 'number of threads')
-flags.DEFINE_string('dataset','0112', 'checkpoint name')
+flags.DEFINE_integer('num_threads', 8, 'number of threads')
+flags.DEFINE_string('dataset','0115', 'checkpoint name')
 flags.DEFINE_float('gpu_ratio','1.0', 'gpu fraction')
 flags.DEFINE_integer('epochs', 1000, 'epochs size')
 
@@ -36,13 +36,12 @@ def load_and_enqueue(sess,coord,IR_shape,file_list,label_list,S,idx=0,num_thread
 		r = random.randint(0,2)
 		input_img = scipy.misc.imread(file_list[S[i]]).reshape([224,224,1]).astype(np.float32)
 		gt_img = scipy.misc.imread(label_list[S[i]]).reshape([224,224,3]).astype(np.float32)
-		pdb.set_trace()
 		input_img = input_img/127.5 -1.
 		gt_img = gt_img/127.5 -1.
-		rand_x = np.random.randint(64,224-64)
-		rand_y = np.random.randint(64,224-64)
-		ipt =  input_img[rand_y:rand_y+64,rand_x:rand_x+64,:]
-		label = gt_img[rand_y:rand_y+64,rand_x:rand_x+64,:]
+		rand_x = np.random.randint(32,224-32)
+		rand_y = np.random.randint(32,224-32)
+		ipt =  input_img[rand_y:rand_y+32,rand_x:rand_x+32,:]
+		label = gt_img[rand_y:rand_y+32,rand_x:rand_x+32,:]
 		mask = create_mask(ipt)
 		#gamma = np.random.uniform(0.7,2.5)
 		#gamma = 2.2	
@@ -58,8 +57,8 @@ if __name__ =='__main__':
 	if not os.path.exists(os.path.join('checkpoint',FLAGS.dataset)):
 	    os.makedirs(os.path.join('checkpoint',FLAGS.dataset))
 
-	IR_shape=[64,64,1]
-	Normal_shape=[64,64,3]
+	IR_shape=[32,32,1]
+	Normal_shape=[32,32,3]
 
 	# Threading setting 
 	print 'Queue loading'
@@ -78,7 +77,7 @@ if __name__ =='__main__':
 	# Discriminator loss
 	D_loss_real = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(D_real_logits, tf.random_uniform(D_real.get_shape(),minval=0.7,maxval=1.2,dtype=tf.float32)))
 	D_loss_fake = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(D_fake_logits, tf.random_uniform(D_fake.get_shape(),minval=0.0,maxval=0.3,dtype=tf.float32)))
-	D_loss = D_loss_real + D_loss_fake
+	D_loss = (D_loss_real + D_loss_fake) * 0.01
 
 	# Generator loss
 	#G_loss= tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(D_fake_logits, tf.ones_like(D_fake)))
@@ -88,11 +87,11 @@ if __name__ =='__main__':
 	Output = ang_loss.l2_normalize(Output)
 	L2_loss = tf.reduce_mean(tf.square(GT-Output))
 	#L2_loss = tf.sqrt(tf.reduce_mean(tf.square(GT-Output)))
-	ang_tmp,ang_loss = ang_loss.ang_error(pred_Normal[:,10:-10,10:-10,:],Normal_images[:,10:-10,10:-10,:]) # ang_loss is normalized 0~1
+	ang_loss = ang_loss.ang_error(pred_Normal[:,10:-10,10:-10,:],Normal_images[:,10:-10,10:-10,:]) # ang_loss is normalized 0~1
 	#ei_loss = tf.py_func(compute_ei,[pred_Normal],[tf.float64])
 	#ei_loss = tf.pack(ei_loss[0])
 	#ei_loss = tf.to_float(ei_loss[0])
-	Gen_loss = G_loss + L2_loss*100 + ang_loss*100
+	Gen_loss = G_loss*0.1 + L2_loss*30 + ang_loss*10
 
 	# Optimizer
 	t_vars = tf.trainable_variables()
@@ -100,7 +99,7 @@ if __name__ =='__main__':
 	g_vars =[var for var in t_vars if 'conv_' in var.name]
 	global_step = tf.Variable(0,name='global_step',trainable=False)
 	global_step1 = tf.Variable(0,name='global_step1',trainable=False)
-	g_lr = tf.train.exponential_decay(FLAGS.learning_rate,global_step,20000,0.6,staircase=True)
+	g_lr = tf.train.exponential_decay(FLAGS.learning_rate,global_step,95000,0.75,staircase=True)
 	G_opt = tf.train.AdamOptimizer(g_lr).minimize(Gen_loss,global_step=global_step,var_list=g_vars)
 	D_opt = tf.train.AdamOptimizer(g_lr).minimize(D_loss,global_step=global_step1,var_list=d_vars)
 
@@ -155,7 +154,7 @@ if __name__ =='__main__':
 	    	for idx in xrange(0,batch_idxs):
 			start_time = time.time()
 			_,d_loss_real,d_loss_fake = sess.run([D_opt,D_loss_real,D_loss_fake],feed_dict={keep_prob:FLAGS.dropout})
-			_,g_loss,ang_err,ang_err2,L_loss = sess.run([G_opt,G_loss,ang_loss,ang_tmp,L2_loss],feed_dict={keep_prob:FLAGS.dropout})
+			_,g_loss,ang_err,L_loss = sess.run([G_opt,G_loss,ang_loss,L2_loss],feed_dict={keep_prob:FLAGS.dropout})
 			print("Epoch: [%2d] [%4d/%4d] time: %4.4f g_loss: %.6f d_real: %.6f d_fake: %.6f L_loss:%.4f ang_loss: %.6f" \
 			% (epoch, idx, batch_idxs,time.time() - start_time,g_loss,d_loss_real,d_loss_fake,L_loss,ang_err))
 			sum_L += L_loss 	

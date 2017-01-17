@@ -80,7 +80,7 @@ if __name__ =='__main__':
 				t = np.square(sample)
 				t = np.sqrt(t.sum(axis=2))
 				t = np.expand_dims(t,axis=-1)
-				sample/=t	
+				sample=sample/t	
 			        sample = (sample+1.)/2.
 				
 			        if not os.path.exists(os.path.join(savepath,'%s/%s/%03d/%d' %(FLAGS.dataset,ckpt_name,list_val[idx],idx2))):
