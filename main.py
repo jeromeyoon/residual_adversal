@@ -13,7 +13,7 @@ flags.DEFINE_float('learning_rate', 0.0002, 'Learning rate')
 flags.DEFINE_float('dropout', 0.5, 'Drop out')
 flags.DEFINE_integer('batch_size', 20, 'Batch size')
 flags.DEFINE_integer('num_threads', 8, 'number of threads')
-flags.DEFINE_string('dataset','0115', 'checkpoint name')
+flags.DEFINE_string('dataset','0117', 'checkpoint name')
 flags.DEFINE_float('gpu_ratio','1.0', 'gpu fraction')
 flags.DEFINE_integer('epochs', 1000, 'epochs size')
 
@@ -38,10 +38,10 @@ def load_and_enqueue(sess,coord,IR_shape,file_list,label_list,S,idx=0,num_thread
 		gt_img = scipy.misc.imread(label_list[S[i]]).reshape([224,224,3]).astype(np.float32)
 		input_img = input_img/127.5 -1.
 		gt_img = gt_img/127.5 -1.
-		rand_x = np.random.randint(32,224-32)
-		rand_y = np.random.randint(32,224-32)
-		ipt =  input_img[rand_y:rand_y+32,rand_x:rand_x+32,:]
-		label = gt_img[rand_y:rand_y+32,rand_x:rand_x+32,:]
+		rand_x = np.random.randint(64,224-64)
+		rand_y = np.random.randint(64,224-64)
+		ipt =  input_img[rand_y:rand_y+64,rand_x:rand_x+64,:]
+		label = gt_img[rand_y:rand_y+64,rand_x:rand_x+64,:]
 		mask = create_mask(ipt)
 		#gamma = np.random.uniform(0.7,2.5)
 		#gamma = 2.2	
@@ -57,8 +57,8 @@ if __name__ =='__main__':
 	if not os.path.exists(os.path.join('checkpoint',FLAGS.dataset)):
 	    os.makedirs(os.path.join('checkpoint',FLAGS.dataset))
 
-	IR_shape=[32,32,1]
-	Normal_shape=[32,32,3]
+	IR_shape=[64,64,1]
+	Normal_shape=[64,64,3]
 
 	# Threading setting 
 	print 'Queue loading'
@@ -87,7 +87,7 @@ if __name__ =='__main__':
 	Output = ang_loss.l2_normalize(Output)
 	L2_loss = tf.reduce_mean(tf.square(GT-Output))
 	#L2_loss = tf.sqrt(tf.reduce_mean(tf.square(GT-Output)))
-	ang_loss = ang_loss.ang_error(pred_Normal[:,10:-10,10:-10,:],Normal_images[:,10:-10,10:-10,:]) # ang_loss is normalized 0~1
+	ang_loss,ang_tmp = ang_loss.ang_error(pred_Normal[:,10:-10,10:-10,:],Normal_images[:,10:-10,10:-10,:]) # ang_loss is normalized 0~1
 	#ei_loss = tf.py_func(compute_ei,[pred_Normal],[tf.float64])
 	#ei_loss = tf.pack(ei_loss[0])
 	#ei_loss = tf.to_float(ei_loss[0])
@@ -154,7 +154,7 @@ if __name__ =='__main__':
 	    	for idx in xrange(0,batch_idxs):
 			start_time = time.time()
 			_,d_loss_real,d_loss_fake = sess.run([D_opt,D_loss_real,D_loss_fake],feed_dict={keep_prob:FLAGS.dropout})
-			_,g_loss,ang_err,L_loss = sess.run([G_opt,G_loss,ang_loss,L2_loss],feed_dict={keep_prob:FLAGS.dropout})
+			_,g_loss,ang_err,L_loss,ang_err2 = sess.run([G_opt,G_loss,ang_loss,L2_loss,ang_tmp],feed_dict={keep_prob:FLAGS.dropout})
 			print("Epoch: [%2d] [%4d/%4d] time: %4.4f g_loss: %.6f d_real: %.6f d_fake: %.6f L_loss:%.4f ang_loss: %.6f" \
 			% (epoch, idx, batch_idxs,time.time() - start_time,g_loss,d_loss_real,d_loss_fake,L_loss,ang_err))
 			sum_L += L_loss 	

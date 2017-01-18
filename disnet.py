@@ -3,7 +3,6 @@ from ops import lrelu ,linear
 from resnet import conv_layer
 import pdb
 def disnet(ipt,keep_prob,df_dims,reuse=False):
-    pdb.set_trace()
     num_block =1
     layers=[]
     if reuse:

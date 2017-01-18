@@ -14,7 +14,7 @@ def ang_error(samples,gt_samples):
     gt_output = l2_normalize(gt_samples)
     tmp = tf.reduce_sum(tf.mul(output,gt_output),3)
     output = tf.div(tf.reduce_sum(tf.sub(tf.ones_like(tmp,dtype=tf.float32),tmp)),valid_pixel)
-    return output
+    return output,tmp
 
 def l2_normalize(input_):
     tmp1 = tf.square(input_)
