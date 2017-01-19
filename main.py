@@ -13,7 +13,7 @@ flags.DEFINE_float('learning_rate', 0.0002, 'Learning rate')
 flags.DEFINE_float('dropout', 0.5, 'Drop out')
 flags.DEFINE_integer('batch_size', 20, 'Batch size')
 flags.DEFINE_integer('num_threads', 8, 'number of threads')
-flags.DEFINE_string('dataset','0117', 'checkpoint name')
+flags.DEFINE_string('dataset','0118', 'checkpoint name')
 flags.DEFINE_float('gpu_ratio','1.0', 'gpu fraction')
 flags.DEFINE_integer('epochs', 1000, 'epochs size')
 
@@ -91,7 +91,7 @@ if __name__ =='__main__':
 	#ei_loss = tf.py_func(compute_ei,[pred_Normal],[tf.float64])
 	#ei_loss = tf.pack(ei_loss[0])
 	#ei_loss = tf.to_float(ei_loss[0])
-	Gen_loss = G_loss*0.1 + L2_loss*30 + ang_loss*10
+	Gen_loss = G_loss*0.5 + L2_loss*15 + ang_loss*15
 
 	# Optimizer
 	t_vars = tf.trainable_variables()
