@@ -115,3 +115,12 @@ def linear(input_, output_size, scope=None, stddev=0.02, bias_start=0.0, with_w=
             return tf.matmul(input_, matrix) + bias, matrix, bias
         else:
             return tf.matmul(input_, matrix) + bias
+
+def scale_invariant(output,gt):
+    batch,h,w,ch = output.get_shape().as_list()
+    diff = gt - output
+    #scale_inv1 = tf.div(tf.reduce_sum(tf.square(diff_log)),tf.to_float(GT.get_shape()[0]))
+    scale_inv1 = tf.reduce_sum(tf.square(diff),[1,2,3])/(ch*h*w)
+    scale_inv2 = tf.square(tf.reduce_sum(diff,[1,2,3]))/(ch*h*w)**2
+    scale_inv = scale_inv1 - scale_inv2*0.5
+    return tf.reduce_sum(scale_inv)/batch

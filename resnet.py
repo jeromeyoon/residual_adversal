@@ -14,11 +14,16 @@ def softmax_layer(inpt, shape):
 
     return fc_h
 
-def conv_layer(inpt, filter_shape, stride,batch=True):
+def conv_layer(inpt, filter_shape, stride,relu=True):
     out_channels = filter_shape[3]
 
     filter_ = weight_variable(filter_shape)
-    conv = tf.nn.conv2d(inpt, filter=filter_, strides=[1, stride, stride, 1], padding="SAME")
+    conv = tf.nn.conv2d(inpt, filter=filter_, strides=[1, stride, stride, 1], padding="SAME") 
+    conv =  instance_norm(conv)
+    if relu:
+        conv = tf.nn.relu(conv)
+    return conv
+    """
     mean, var = tf.nn.moments(conv, axes=[0,1,2])
     beta = tf.Variable(tf.zeros([out_channels]), name="beta")
     gamma = weight_variable([out_channels], name="gamma")
@@ -31,6 +36,7 @@ def conv_layer(inpt, filter_shape, stride,batch=True):
     else:
         out = tf.nn.relu(conv)
         return out
+    """
 def residual_block(inpt, output_depth, down_sample, projection=False):
     input_depth = inpt.get_shape().as_list()[3]
     if down_sample:
@@ -38,7 +44,7 @@ def residual_block(inpt, output_depth, down_sample, projection=False):
         inpt = tf.nn.max_pool(inpt, ksize=filter_, strides=filter_, padding='SAME')
 
     conv1 = conv_layer(inpt, [3, 3, input_depth, output_depth], 1)
-    conv2 = conv_layer(conv1, [3, 3, output_depth, output_depth], 1)
+    conv2 = conv_layer(conv1, [3, 3, output_depth, output_depth], 1,relu=False)
 
     if input_depth != output_depth:
         if projection:
@@ -54,8 +60,33 @@ def residual_block(inpt, output_depth, down_sample, projection=False):
     return res
 
 
-def deconv_layer(inpt,output_shape,filter_shape,stride):
+def instance_norm(net, train=True):
+    batch, rows, cols, channels = [i.value for i in net.get_shape()]
+    var_shape = [channels]
+    mu, sigma_sq = tf.nn.moments(net, [1,2], keep_dims=True)
+    shift = tf.Variable(tf.zeros(var_shape))
+    scale = tf.Variable(tf.ones(var_shape))
+    epsilon = 1e-3
+    normalized = (net-mu)/(sigma_sq + epsilon)**(.5)
+    return scale * normalized + shift
 
+def deconv_layer(inpt,num_filter,filter_size,stride):
+    input_depth = inpt.get_shape().as_list()[3]
+    filter_shape =[filter_size,filter_size,num_filter,input_depth]
     filter_ = weight_variable(filter_shape)
-    deconv = tf.nn.conv2d_transpose(inpt,filter_,output_shape=output_shape,strides=[1,stride,stride,1],padding='SAME')
-    return deconv
+    batch, rows, cols, channels = [i.value for i in inpt.get_shape()]
+    new_rows, new_cols = int(rows*stride),int(cols*stride)
+    new_shape =[batch,new_rows,new_cols,num_filter]
+    tf_shape = tf.pack(new_shape)
+    deconv = tf.nn.conv2d_transpose(inpt,filter_,tf_shape,[1,stride,stride,1],padding='SAME')
+    ceconv = instance_norm(deconv)	
+    return tf.nn.relu(deconv)
+
+
+
+
+
+
+
+
+
