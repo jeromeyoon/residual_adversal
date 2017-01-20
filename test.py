@@ -42,7 +42,7 @@ if __name__ =='__main__':
 	pdb.set_trace()
 	if ckpt and ckpt.model_checkpoint_path :
 	    	print "Restoring from checkpoint"
-        	ckpt_name = os.path.basename(ckpt.all_model_checkpoint_paths[-4])
+        	ckpt_name = os.path.basename(ckpt.all_model_checkpoint_paths[-1])
 		saver.restore(sess, os.path.join('checkpoint',FLAGS.dataset,ckpt_name))
 	else:
 	    	print "Couldn't find checkpoint to restore from. Starting over."
