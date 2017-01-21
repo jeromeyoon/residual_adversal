@@ -22,6 +22,9 @@ def create_mask(images):
     return tmp1
 
 
+def create_mask2(images):
+    tmp1 = [images ==-1.][0]*-1.
+    return tmp1
 if __name__ =='__main__':
 
 	IR_shape=[1,600,800,1]
@@ -33,7 +36,7 @@ if __name__ =='__main__':
 	keep_prob = tf.placeholder(tf.float32)
 
 	# Buidl networks
-	pred_Normal = models.resnet(IR_images, 20,64)
+	pred_Normal = models.resnet(IR_images, 20,32)
 	sess = tf.Session()
 	sess.run(tf.initialize_all_variables())
 
@@ -66,29 +69,28 @@ if __name__ =='__main__':
 			        input_ = np.reshape(input_,(1,600,800,1)) 
 			        input_ = np.array(input_).astype(np.float32)
 				mask = create_mask(input_)
-				"""
-			        gt_ = scipy.misc.imread(img+'/12_Normal.bmp').astype(float)
-			        gt_ = np.sum(gt_,axis=2)
-			        gt_ = scipy.misc.imresize(gt_,[600,800])
-			        gt_ = np.reshape(gt_,[1,600,800,1])
-				"""
-			        #mask =[gt_ >0.0][0]*1.0
-			        #mean_mask = mean_nir * mask
+				mask = np.squeeze(create_mask(input_))
+				mask = np.expand_dims(mask,axis=-1)
+				mask2 = np.squeeze(create_mask2(input_))
+				mask2 = np.expand_dims(mask2,axis=-1)
+				mask2 = np.tile(mask2,(1,1,3))
 			        #input_ = input_ - mean_mask	
 			        start_time = time.time() 
 			        sample  = sess.run(pred_Normal, feed_dict={IR_images: input_})
-			        #sample = sess.run(dcgan.sampler, feed_dict={dcgan.ir_images: input_})
 			        print('time: %.8f' %(time.time()-start_time))     
 			        # normalization #
 			        sample = np.squeeze(sample).astype(np.float32)
-			        output = np.sqrt(np.sum(np.power(sample,2),axis=2))
-			        output = np.expand_dims(output,axis=-1)
-			        output = sample/output
-			        output = (output+1.)/2.
+				sample = sample * mask +mask2
+				t = np.square(sample)
+				t = np.sqrt(t.sum(axis=2))
+				t = np.expand_dims(t,axis=-1)
+				sample=sample/t	
+			        sample = (sample+1.)/2.
+
 			        if not os.path.exists(os.path.join(savepath,'%s/%s/%03d/%d' %(FLAGS.dataset,ckpt_name,list_val[idx],idx2))):
 			            os.makedirs(os.path.join(savepath,'%s/%s/%03d/%d' %(FLAGS.dataset,ckpt_name,list_val[idx],idx2)))
 			        savename = os.path.join(savepath,'%s/%s/%03d/%d/single_normal_%03d.bmp' % (FLAGS.dataset,ckpt_name,list_val[idx],idx2,idx3))
-			        scipy.misc.imsave(savename, output)
+			        scipy.misc.imsave(savename, sample)
 
 
 	sess.close()
