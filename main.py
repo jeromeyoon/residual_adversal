@@ -65,7 +65,6 @@ if __name__ =='__main__':
 
 	# Buidl networks
 	pred_Normal = models.resnet(IR_images, 20,32)
-	pdb.set_trace()
 	D_real,D_real_logits = disnet.disnet(Normal_images,keep_prob,32)
 	D_fake,D_fake_logits = disnet.disnet(pred_Normal,keep_prob,32,reuse=True)
 	# Discriminator loss
@@ -93,6 +92,7 @@ if __name__ =='__main__':
 	t_vars = tf.trainable_variables()
 	d_vars =[var for var in t_vars if 'dis_' in var.name]
 	g_vars =[var for var in t_vars if 'conv' in var.name]
+	pdb.set_trace()
 	global_step = tf.Variable(0,name='global_step',trainable=False)
 	global_step1 = tf.Variable(0,name='global_step1',trainable=False)
 	#g_lr = tf.train.exponential_decay(FLAGS.learning_rate,global_step,20000,0.6,staircase=True)
