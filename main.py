@@ -9,11 +9,12 @@ import tensorflow as tf
 
 flags = tf.app.flags
 FLAGS = flags.FLAGS
-flags.DEFINE_float('learning_rate', 0.0002, 'Learning rate')
+flags.DEFINE_float('g_lr', 0.0002, 'Learning rate')
+flags.DEFINE_float('d_lr', 0.0001, 'Learning rate')
 flags.DEFINE_float('dropout', 0.7, 'Drop out')
 flags.DEFINE_integer('batch_size', 20, 'Batch size')
 flags.DEFINE_integer('num_threads', 32, 'number of threads')
-flags.DEFINE_string('dataset','0105', 'checkpoint name')
+flags.DEFINE_string('dataset','0121', 'checkpoint name')
 flags.DEFINE_float('gpu_ratio','1.0', 'gpu fraction')
 flags.DEFINE_integer('epochs', 1000, 'epochs size')
 
@@ -61,9 +62,9 @@ if __name__ =='__main__':
 	IR_images,Normal_images = q.dequeue_many(FLAGS.batch_size)
 
 	# Buidl networks
-	pred_Normal = models.resnet(IR_images, 20,64)
-	D_real,D_real_logits = disnet.disnet(Normal_images,keep_prob,64)
-	D_fake,D_fake_logits = disnet.disnet(pred_Normal,keep_prob,64,reuse=True)
+	pred_Normal = models.resnet(IR_images, 20,32)
+	D_real,D_real_logits = disnet.disnet(Normal_images,keep_prob,32)
+	D_fake,D_fake_logits = disnet.disnet(pred_Normal,keep_prob,32,reuse=True)
 	# Discriminator loss
 	D_loss_real = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(D_real_logits, tf.random_uniform(D_real.get_shape(),minval=0.7,maxval=1.2,dtype=tf.float32,seed=0)))
 	D_loss_fake = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(D_fake_logits, tf.random_uniform(D_fake.get_shape(),minval=0.0,maxval=0.3,dtype=tf.float32,seed=0)))
@@ -76,12 +77,12 @@ if __name__ =='__main__':
 	# Generator loss
 	G_loss= tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(D_fake_logits, tf.ones_like(D_fake)))
 	#G_loss = binary_cross_entropy_with_logits(tf.ones_like(D_fake), D_fake)
-	L2_loss = tf.sqrt(tf.reduce_mean(tf.square(Normal_images - pred_Normal)))
+	L2_loss = tf.reduce_mean(tf.square(ang_loss.l2_normalize(Normal_images) - ang_loss.l2_normalize(pred_Normal)))
 	ang_loss = ang_loss.ang_error(pred_Normal,Normal_images) # ang_loss is normalized 0~1
-	ei_loss = tf.py_func(compute_ei,[pred_Normal],[tf.float64])
+	#ei_loss = tf.py_func(compute_ei,[pred_Normal],[tf.float64])
 	#ei_loss = tf.pack(ei_loss[0])
-	ei_loss = tf.to_float(ei_loss[0])
-	Gen_loss = G_loss + L2_loss*100 + ang_loss*100 + ei_loss
+	#ei_loss = tf.to_float(ei_loss[0])
+	Gen_loss = G_loss + L2_loss + ang_loss #+ ei_loss
 
 	# Optimizer
 	t_vars = tf.trainable_variables()
@@ -89,9 +90,10 @@ if __name__ =='__main__':
 	g_vars =[var for var in t_vars if 'conv_' in var.name]
 	global_step = tf.Variable(0,name='global_step',trainable=False)
 	global_step1 = tf.Variable(0,name='global_step1',trainable=False)
-	g_lr = tf.train.exponential_decay(FLAGS.learning_rate,global_step,6000,0.5,staircase=True)
+	g_lr = tf.train.exponential_decay(FLAGS.g_lr,global_step,6000,0.7,staircase=True)
+	d_lr = tf.train.exponential_decay(FLAGS.d_lr,global_step1,6000,0.7,staircase=True)
 	G_opt = tf.train.AdamOptimizer(g_lr).minimize(Gen_loss,global_step=global_step,var_list=g_vars)
-	D_opt = tf.train.AdamOptimizer(g_lr).minimize(D_loss,global_step=global_step1,var_list=d_vars)
+	D_opt = tf.train.AdamOptimizer(d_lr).minimize(D_loss,global_step=global_step1,var_list=d_vars)
 
 
 	config = tf.ConfigProto()
@@ -140,17 +142,16 @@ if __name__ =='__main__':
 	    	for idx in xrange(0,batch_idxs):
 			start_time = time.time()
 			_,d_loss_real,d_loss_fake = sess.run([D_opt,D_loss_real,D_loss_fake],feed_dict={keep_prob:FLAGS.dropout})
-			_,g_loss,ang_err,L_loss,ei_err = sess.run([G_opt,G_loss,ang_loss,L2_loss,ei_loss],feed_dict={keep_prob:FLAGS.dropout})
-			print("Epoch: [%2d] [%4d/%4d] time: %4.4f g_loss: %.6f d_real: %.6f d_fake: %.6f L_loss:%.4f ang_loss: %.6f ei_loss: %.6f" \
-			% (epoch, idx, batch_idxs,time.time() - start_time,g_loss,d_loss_real,d_loss_fake,L_loss,ang_err,ei_err))
+			_,g_loss,ang_err,L_loss = sess.run([G_opt,G_loss,ang_loss,L2_loss],feed_dict={keep_prob:FLAGS.dropout})
+			print("Epoch: [%2d] [%4d/%4d] time: %4.4f g_loss: %.6f d_real: %.6f d_fake: %.6f L_loss:%.4f ang_loss: %.6f" \
+			% (epoch, idx, batch_idxs,time.time() - start_time,g_loss,d_loss_real,d_loss_fake,L_loss,ang_err))
 			sum_L += L_loss 	
 			sum_g += g_loss
 			sum_ang += ang_err
-			sum_ei += ei_err
 	    		if np.mod(global_step.eval(session=sess),6000) ==0:
 			    saver.save(sess,os.path.join('checkpoint',FLAGS.dataset,'Res_DCGAN'),global_step=global_step)
 
-	    	train_log.write('epoch %06d mean_g %.6f  mean_L %.6f mean_ang %.6f mean_ei %.6f\n' %(epoch,sum_g/(batch_idxs),sum_L/(batch_idxs),sum_ang/batch_idxs,sum_ei/batch_idxs))
+	    	train_log.write('epoch %06d mean_g %.6f  mean_L %.6f mean_ang %.6f \n' %(epoch,sum_g/(batch_idxs),sum_L/(batch_idxs),sum_ang/batch_idxs))
 	    	train_log.close()
 	    	saver.save(sess,os.path.join('checkpoint',FLAGS.dataset,'Res_DCGAN'),global_step=global_step)
 

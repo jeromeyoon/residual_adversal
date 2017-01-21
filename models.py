@@ -12,45 +12,30 @@ def resnet(inpt, n,num_filter):
     layers = []
 
     with tf.variable_scope('conv1'):
-        conv1 = conv_layer(inpt, [3, 3, 1, 64], 1)
+        conv1 = conv_layer(inpt, [5, 5, 1, num_filter], 2)
         layers.append(conv1)
 
-    for i in range (num_conv):
-        with tf.variable_scope('conv2_%d' % (i+1)):
-            conv2_x = residual_block(layers[-1], num_filter, False)
-            conv2 = residual_block(conv2_x, num_filter, False)
-            layers.append(conv2_x)
-            layers.append(conv2)
+    with tf.variable_scope('conv2'):
+        conv2 = conv_layer(layers[-1], [3, 3, num_filter, num_filter*2],2)
+        layers.append(conv2)
 
-        assert conv2.get_shape().as_list()[1:] == [dims[1], dims[2], num_filter]
-
-    for i in range (num_conv):
+    for i in range (2):
         with tf.variable_scope('conv3_%d' % (i+1)):
-            conv3_x = residual_block(layers[-1], num_filter, False)
-            conv3 = residual_block(conv3_x, num_filter, False)
-            layers.append(conv3_x)
+            conv3 = residual_block(layers[-1], num_filter*4, False)
             layers.append(conv3)
 
-        assert conv3.get_shape().as_list()[1:] == [dims[1], dims[2], num_filter]
-    
-    for i in range (num_conv):
-        with tf.variable_scope('conv4_%d' % (i+1)):
-            conv4_x = residual_block(layers[-1], 64, False)
-            conv4 = residual_block(conv4_x, 64, False)
-            layers.append(conv4_x)
-            layers.append(conv4)
+    with tf.variable_scope('conv_t1'):
+	conv_t1 = deconv_layer(layers[-1],num_filter*2,3,2)
+	layers.append(conv_t1)
 
-        assert conv4.get_shape().as_list()[1:] == [dims[1],dims[2],num_filter]
-
-    for i in range (num_conv):
-        with tf.variable_scope('conv5_%d' % (i+1)):
-            conv5_x = residual_block(layers[-1], 64, False)
-            conv5 = residual_block(conv5_x, 64, False)
-            layers.append(conv4_x)
-            layers.append(conv4)
-
-        assert conv4.get_shape().as_list()[1:] == [dims[1],dims[2],num_filter]
-
+    with tf.variable_scope('conv_t2'):
+	conv_t2 = deconv_layer(layers[-1],num_filter,3,2)
+	layers.append(conv_t2)
+    """
+    with tf.variable_scope('conv4'):
+        conv4 = conv_layer(layers[-1], [3, 3, num_filter*4, num_filter], 1)
+        layers.append(conv4)
+    """
     with tf.variable_scope('conv_final'):
 	filter_shape = [3,3,layers[-1].get_shape().as_list()[3],3]
 	filter_ = weight_variable(filter_shape)
