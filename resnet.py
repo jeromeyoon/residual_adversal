@@ -14,23 +14,23 @@ def softmax_layer(inpt, shape):
 
     return fc_h
 
-def conv_layer(inpt, filter_shape, stride,batch=True):
+def conv_layer(inpt, filter_shape, stride,batch=True,relu=True):
     out_channels = filter_shape[3]
 
     filter_ = weight_variable(filter_shape)
-    conv = tf.nn.conv2d(inpt, filter=filter_, strides=[1, stride, stride, 1], padding="SAME")
-    mean, var = tf.nn.moments(conv, axes=[0,1,2])
+    net = tf.nn.conv2d(inpt, filter=filter_, strides=[1, stride, stride, 1], padding="SAME")
+    mean, var = tf.nn.moments(net, axes=[0,1,2])
     beta = tf.Variable(tf.zeros([out_channels]), name="beta")
     gamma = weight_variable([out_channels], name="gamma")
     if batch: 
-        batch_norm = tf.nn.batch_norm_with_global_normalization(
-            conv, mean, var, beta, gamma, 0.001,
+        net = tf.nn.batch_norm_with_global_normalization(
+            net, mean, var, beta, gamma, 0.001,
             scale_after_normalization=True)
-        out = tf.nn.relu(batch_norm)
-        return out
+    if relu:
+        net = tf.nn.relu(net)
+	return net
     else:
-        out = tf.nn.relu(conv)
-        return out
+        return net
 def residual_block(inpt, output_depth, down_sample, projection=False):
     input_depth = inpt.get_shape().as_list()[3]
     if down_sample:
@@ -38,7 +38,7 @@ def residual_block(inpt, output_depth, down_sample, projection=False):
         inpt = tf.nn.max_pool(inpt, ksize=filter_, strides=filter_, padding='SAME')
 
     conv1 = conv_layer(inpt, [3, 3, input_depth, output_depth], 1)
-    conv2 = conv_layer(conv1, [3, 3, output_depth, output_depth], 1)
+    conv2 = conv_layer(conv1, [3, 3, output_depth, output_depth], 1,relu=False)
 
     if input_depth != output_depth:
         if projection:

@@ -34,7 +34,7 @@ if __name__ =='__main__':
 	keep_prob = tf.placeholder(tf.float32)
 
 	# Buidl networks
-	pred_Normal = models.resnet(IR_images, 20,64)
+	pred_Normal = models.resnet(IR_images, 20,32)
 	sess = tf.Session()
 	sess.run(tf.initialize_all_variables())
 
@@ -56,8 +56,8 @@ if __name__ =='__main__':
 	for idx in range(len(list_val)):
 		if not os.path.exists(os.path.join(savepath,FLAGS.dataset,ckpt_name,'%03d' %list_val[idx])):
 			os.makedirs(os.path.join(savepath,FLAGS.dataset,ckpt_name,'%03d' %list_val[idx]))
-		for idx2 in range(5,7): #tilt angles 1~9 
-			for idx3 in range(5,7): # light source 
+		for idx2 in range(4,9): #tilt angles 1~9 
+			for idx3 in range(4,8): # light source 
 				print("Selected material %03d/%d" % (list_val[idx],idx2))
 			        img = '/research2/IR_normal_small/save%03d/%d' % (list_val[idx],idx2)
 			        input_ = scipy.misc.imread(img+'/%d.bmp' %idx3).astype(np.float32) #input NIR image
@@ -86,7 +86,7 @@ if __name__ =='__main__':
 			        if not os.path.exists(os.path.join(savepath,'%s/%s/%03d/%d' %(FLAGS.dataset,ckpt_name,list_val[idx],idx2))):
 			            os.makedirs(os.path.join(savepath,'%s/%s/%03d/%d' %(FLAGS.dataset,ckpt_name,list_val[idx],idx2)))
 			        savename = os.path.join(savepath,'%s/%s/%03d/%d/single_normal_%03d.bmp' % (FLAGS.dataset,ckpt_name,list_val[idx],idx2,idx3))
-			        scipy.misc.imsave(savename, np.uint8(sample*255))
+			        scipy.misc.imsave(savename, sample)
 				#sio.savemat('11_output.mat',{'normal':sample})
 
 

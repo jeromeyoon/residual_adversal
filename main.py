@@ -9,11 +9,12 @@ import tensorflow as tf
 
 flags = tf.app.flags
 FLAGS = flags.FLAGS
-flags.DEFINE_float('learning_rate', 0.0002, 'Learning rate')
+flags.DEFINE_float('g_lr', 0.00025, 'Learning rate')
+flags.DEFINE_float('d_lr', 0.00001, 'Learning rate')
 flags.DEFINE_float('dropout', 0.5, 'Drop out')
 flags.DEFINE_integer('batch_size', 20, 'Batch size')
 flags.DEFINE_integer('num_threads', 8, 'number of threads')
-flags.DEFINE_string('dataset','0118', 'checkpoint name')
+flags.DEFINE_string('dataset','0119', 'checkpoint name')
 flags.DEFINE_float('gpu_ratio','1.0', 'gpu fraction')
 flags.DEFINE_integer('epochs', 1000, 'epochs size')
 
@@ -71,27 +72,27 @@ if __name__ =='__main__':
 	IR_images,Mask_images,Normal_images = q.dequeue_many(FLAGS.batch_size)
 
 	# Buidl networks
-	pred_Normal = models.resnet(IR_images, 20,64)
-	D_real,D_real_logits = disnet.disnet(Normal_images,keep_prob,64)
-	D_fake,D_fake_logits = disnet.disnet(pred_Normal,keep_prob,64,reuse=True)
+	pred_Normal = models.resnet(IR_images, 20,32)
+	D_real,D_real_logits = disnet.disnet(Normal_images,keep_prob,32)
+	D_fake,D_fake_logits = disnet.disnet(pred_Normal,keep_prob,32,reuse=True)
 	# Discriminator loss
 	D_loss_real = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(D_real_logits, tf.random_uniform(D_real.get_shape(),minval=0.7,maxval=1.2,dtype=tf.float32)))
 	D_loss_fake = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(D_fake_logits, tf.random_uniform(D_fake.get_shape(),minval=0.0,maxval=0.3,dtype=tf.float32)))
-	D_loss = (D_loss_real + D_loss_fake) * 0.01
+	D_loss = (D_loss_real + D_loss_fake)
 
 	# Generator loss
-	#G_loss= tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(D_fake_logits, tf.ones_like(D_fake)))
 	G_loss= tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(D_fake_logits, tf.random_uniform(D_fake.get_shape(),minval=0.7,maxval=1.2,dtype=tf.float32)))
 	GT = Normal_images[:,10:-10,10:-10,:]
 	Output = pred_Normal[:,10:-10,10:-10,:]
+	GT = ang_loss.l2_normalize(GT)
 	Output = ang_loss.l2_normalize(Output)
 	L2_loss = tf.reduce_mean(tf.square(GT-Output))
-	#L2_loss = tf.sqrt(tf.reduce_mean(tf.square(GT-Output)))
+	L1_loss = tf.reduce_mean(tf.abs(GT-Output))
 	ang_loss,ang_tmp = ang_loss.ang_error(pred_Normal[:,10:-10,10:-10,:],Normal_images[:,10:-10,10:-10,:]) # ang_loss is normalized 0~1
 	#ei_loss = tf.py_func(compute_ei,[pred_Normal],[tf.float64])
 	#ei_loss = tf.pack(ei_loss[0])
 	#ei_loss = tf.to_float(ei_loss[0])
-	Gen_loss = G_loss*0.5 + L2_loss*15 + ang_loss*15
+	Gen_loss = G_loss + L2_loss + ang_loss
 
 	# Optimizer
 	t_vars = tf.trainable_variables()
@@ -99,9 +100,9 @@ if __name__ =='__main__':
 	g_vars =[var for var in t_vars if 'conv_' in var.name]
 	global_step = tf.Variable(0,name='global_step',trainable=False)
 	global_step1 = tf.Variable(0,name='global_step1',trainable=False)
-	g_lr = tf.train.exponential_decay(FLAGS.learning_rate,global_step,95000,0.75,staircase=True)
-	G_opt = tf.train.AdamOptimizer(g_lr).minimize(Gen_loss,global_step=global_step,var_list=g_vars)
-	D_opt = tf.train.AdamOptimizer(g_lr).minimize(D_loss,global_step=global_step1,var_list=d_vars)
+	#g_lr = tf.train.exponential_decay(FLAGS.learning_rate,global_step,95000,0.75,staircase=True)
+	G_opt = tf.train.AdamOptimizer(FLAGS.g_lr).minimize(Gen_loss,global_step=global_step,var_list=g_vars)
+	D_opt = tf.train.AdamOptimizer(FLAGS.d_lr).minimize(D_loss,global_step=global_step1,var_list=d_vars)
 
 
 	config = tf.ConfigProto()
@@ -120,12 +121,18 @@ if __name__ =='__main__':
 	    	print "Couldn't find checkpoint to restore from. Starting over."
 
 	####### Load training dataset #########
-        data = json.load(open("/research2/ECCV_journal/with_light/json/traininput.json"))
-        data_label = json.load(open("/research2/ECCV_journal/with_light/json/traingt.json"))
+	data = json.load(open("/research2/IR_normal_small/json/traininput_single_224_large.json"))
+        data_label = json.load(open("/research2/IR_normal_small/json/traingt_single_224_large.json"))
+        train_input =[', '.join(data[idx]) for idx in xrange(0,len(data))]
+        train_gt =[', '.join(data_label[idx]) for idx in xrange(0,len(data))]
+
+
+        #data = json.load(open("/research2/ECCV_journal/with_light/json/traininput.json"))
+        #data_label = json.load(open("/research2/ECCV_journal/with_light/json/traingt.json"))
 	#data = json.load(open("/research2/ECCV_journal/deconv/Adversal_vgg/patch_224/traininput.json"))
 	#data_label = json.load(open("/research2/ECCV_journal/deconv/Adversal_vgg/patch_224/traingt.json"))
-	train_input =[data[idx] for idx in xrange(0,len(data))]
-	train_gt =[data_label[idx] for idx in xrange(0,len(data))]
+	#train_input =[data[idx] for idx in xrange(0,len(data))]
+	#train_gt =[data_label[idx] for idx in xrange(0,len(data))]
 	#train_input =[''.join(train_input[idx]) for idx in xrange(0,len(train_input))]
 	#train_gt =[''.join(train_gt[idx]) for idx in xrange(0,len(train_gt))]
 	S = range(len(train_input))
@@ -141,7 +148,8 @@ if __name__ =='__main__':
 
 	for epoch in xrange(FLAGS.epochs):
 	    	batch_idxs = len(train_input)/FLAGS.batch_size
-	    	sum_L = 0.0
+	    	sum_L1 = 0.0
+	    	sum_L2 = 0.0
 	    	sum_g =0.0
 	    	sum_ang =0.0
 	    	sum_ei =0.0
@@ -154,19 +162,19 @@ if __name__ =='__main__':
 	    	for idx in xrange(0,batch_idxs):
 			start_time = time.time()
 			_,d_loss_real,d_loss_fake = sess.run([D_opt,D_loss_real,D_loss_fake],feed_dict={keep_prob:FLAGS.dropout})
-			_,g_loss,ang_err,L_loss,ang_err2 = sess.run([G_opt,G_loss,ang_loss,L2_loss,ang_tmp],feed_dict={keep_prob:FLAGS.dropout})
-			print("Epoch: [%2d] [%4d/%4d] time: %4.4f g_loss: %.6f d_real: %.6f d_fake: %.6f L_loss:%.4f ang_loss: %.6f" \
-			% (epoch, idx, batch_idxs,time.time() - start_time,g_loss,d_loss_real,d_loss_fake,L_loss,ang_err))
-			sum_L += L_loss 	
+			_,g_loss,ang_err,L1_err,L2_err,ang_err2 = sess.run([G_opt,G_loss,ang_loss,L1_loss,L2_loss,ang_tmp],feed_dict={keep_prob:FLAGS.dropout})
+			print("Epoch: [%2d] [%4d/%4d] time: %4.4f g_loss: %.6f d_real: %.6f d_fake: %.6f L1_loss:%.4f L2_loss:%.4f ang_loss: %.6f" \
+			% (epoch, idx, batch_idxs,time.time() - start_time,g_loss,d_loss_real,d_loss_fake,L1_err,L2_err,ang_err))
+			sum_L1 += L1_err
+			sum_L2 += L2_err 	
 			sum_g += g_loss
 			sum_ang += ang_err
 			#sum_ei += ei_err
-	    		if np.mod(global_step.eval(session=sess),6000) ==0:
+	    		if np.mod(global_step.eval(session=sess),3000) ==0:
 			    saver.save(sess,os.path.join('checkpoint',FLAGS.dataset,'Res_DCGAN'),global_step=global_step)
-
-	    	train_log.write('epoch %06d mean_g %.6f  mean_L %.6f mean_ang %.6f \n' %(epoch,sum_g/(batch_idxs),sum_L/(batch_idxs),sum_ang/batch_idxs))
+	    	train_log.write('epoch %06d mean_g %.6f  mean_L1 %.6f mean_L2 %.6f mean_ang %.6f \n' %(epoch,sum_g/(batch_idxs),sum_L1/batch_idxs,sum_L2/(batch_idxs),sum_ang/batch_idxs))
 	    	train_log.close()
-	    	saver.save(sess,os.path.join('checkpoint',FLAGS.dataset,'Res_DCGAN'),global_step=global_step)
+		saver.save(sess,os.path.join('checkpoint',FLAGS.dataset,'Res_DCGAN'),global_step=global_step)
 
 	sess.close()
 
